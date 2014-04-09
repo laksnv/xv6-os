@@ -1,3 +1,6 @@
+/* MULTI-THREADED SORTING IN LINUX */           // And not in xv6
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
