@@ -19,6 +19,7 @@ extern void forkret(void);
 extern void trapret(void);
 
 static void wakeup1(void *chan);
+struct spinlock growproclock;
 
 void
 pinit(void)
@@ -110,7 +111,9 @@ int
 growproc(int n)
 {
   uint sz;
+  //struct proc *p;
   
+  //pde_t* pgdirtemp = proc->pgdir;
   sz = proc->sz;
   if(n > 0){
     if((sz = allocuvm(proc->pgdir, sz, sz + n)) == 0)
@@ -121,6 +124,18 @@ growproc(int n)
   }
   proc->sz = sz;
   switchuvm(proc);
+/*
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pgdir == pgdirtemp){
+      p->sz = sz;
+      acquire(&growproclock);
+      switchuvm(p);
+      release(&growproclock);
+    }
+  }
+  release(&ptable.lock);
+*/
   return 0;
 }
 
@@ -492,7 +507,49 @@ clone(void (*fcn_arg) (void *), void *arg_arg, void *stack_arg)
     return -1;
   }
 */
- 
+  np->sz = proc->sz;
+  np->parent = proc;
+  *np->tf = *proc->tf;
+
+
+
+
+    //cprintf("\n\n\n\nCur PID: %d\n", proc->pid);
+    //cprintf("\nNP PID: %d\n", np->pid);
+/*
+    cprintf("\nPrinting from clone()\n");
+    cprintf("Before assign\n");
+    cprintf("fcn: %p\n", fcn_arg);
+    cprintf("stack: %p\n", stack_arg);
+    //cprintf("Value at stack: %d\n",*(uint *)stack);
+    cprintf("Value at bottom-1 stack: %d\n", *(uint *)(stack_arg + PGSIZE - 2 * sizeof(void*)));
+    cprintf("Value at bottom stack: %d\n", *(uint *)(stack_arg + PGSIZE - sizeof(void*)));
+    cprintf("Value at bottom-2 stack: %d\n", *(uint *)(stack_arg + PGSIZE - 3 * sizeof(void*)));
+    cprintf("esp: %p\n", np->tf->esp);
+    cprintf("eip: %p\n", np->tf->eip);
+    cprintf("ebp: %p\n\n\n\n\n", np->tf->ebp);
+
+*/
+
+
+
+
+  //cprintf("\nPID: %d\n", np->pid);
+
+  void *arg_in_stack;
+  void *retAdd_in_stack;
+  arg_in_stack = stack_arg + PGSIZE - sizeof(void *);
+  *(uint *)arg_in_stack = (uint) arg_arg;
+
+  retAdd_in_stack = stack_arg + PGSIZE - 2 * sizeof(void *);
+  *(uint *)retAdd_in_stack = 0xFFFFFFF;
+
+  np->tf->esp = (uint) stack_arg;
+  //memmove((void *)np->tf->esp, stack_arg, PGSIZE);
+  np->tf->esp += PGSIZE - 2 * sizeof(void *);
+  np->tf->ebp = np->tf->esp;
+  np->tf->eip = (uint) fcn_arg;
+
 
 
 
@@ -514,10 +571,10 @@ clone(void (*fcn_arg) (void *), void *arg_arg, void *stack_arg)
 
 
 int
-join (void** stack)
+join (void)
 {
   struct proc *p;
-  int havekids, pid;
+  int havekids, pid, x = 0;
 
   acquire(&ptable.lock);
   for(;;)
@@ -526,28 +583,19 @@ join (void** stack)
     havekids = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
     {
-      if(p->parent != proc || p->pgdir != p->parent->pgdir)
-      {
-        //if(p->parent != proc)
+      if(p->parent != proc)
         continue;
-      }
-
       havekids = 1;
       if(p->state == ZOMBIE)
       {
         // Found one.
-  
-        void * stackAddr = (void*) p->parent->tf->esp + 7*sizeof(void*);
-  
-  
-        *(uint*)stackAddr = p->tf->ebp;
-        *(uint*)stackAddr += 3*sizeof(void*) -PGSIZE;
-  
         pid = p->pid;
         kfree(p->kstack);
         p->kstack = 0;
-  
-  
+        if(p->parent->state == RUNNABLE)
+          x = 1;
+        cprintf("\nParent state: %d", x);
+        cprintf("\nProcess %d, killing Process %d", proc->pid, p->pid);
         //freevm(p->pgdir);
         p->state = UNUSED;
         p->pid = 0;
@@ -555,11 +603,6 @@ join (void** stack)
         p->name[0] = 0;
         p->killed = 0;
         release(&ptable.lock);
-        
-        //jp.pid = pid;
-        //jp.ebp = p->tf->ebp;
-        //return jp;
-        
         return pid;
       }
     }
@@ -567,10 +610,7 @@ join (void** stack)
     // No point waiting if we don't have any children.
     if(!havekids || proc->killed)
     {
-      //jp.pid = -1;
-      //jp.ebp = p->tf->ebp;
       release(&ptable.lock);
-      //return jp;
       return -1;
     }
 
@@ -578,3 +618,25 @@ join (void** stack)
     sleep(proc, &ptable.lock);  //DOC: wait-sleep
   }
 }
+
+int
+listprocesses (void)
+{
+  struct proc *p;
+  acquire(&ptable.lock);
+
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+    {
+      if(p->pid != 0)
+        cprintf("\nPID: %d\tPName: %s\n", p->pid, p->name);
+    }
+
+  release(&ptable.lock);
+
+  return 0;
+}
+
+
+
+
+

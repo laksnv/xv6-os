@@ -123,3 +123,55 @@ sys_signal(void)
       
   return (signal(signum, signal_handler));
 }
+
+int
+sys_clone(void)
+{
+  int temp;
+  void *fcn_arg, *stack_arg, *arg_arg;
+
+  if(argint(0, &temp) < 0)
+    return -1;
+  fcn_arg = (void *) temp;
+
+  if(argint(1, &temp) < 0)
+    return -1;
+  arg_arg = (void *) temp;
+
+  if(argint(2, &temp) < 0)
+    stack_arg = (void *) temp;
+
+  return clone(fcn_arg, arg_arg, stack_arg);
+
+}
+
+int
+sys_join(void)
+{
+/*  
+  int temp;
+  void **stack_arg;
+
+  if(argint(0, &temp) < 0)
+    return -1;
+  stack_arg = (void **)temp;
+
+  return join(stack_arg);
+*/
+  return join();
+}
+
+int 
+sys_listprocesses(void)
+{
+  return listprocesses();
+}
+
+
+
+
+
+
+
+
+
