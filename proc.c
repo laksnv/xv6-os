@@ -162,6 +162,7 @@ fork(void)
   return pid;
 }
 
+
 // Exit the current process.  Does not return.
 // An exited process remains in the zombie state
 // until its parent calls wait() to find out it exited.
@@ -469,4 +470,111 @@ signal(int signum, sighandler_t signal_handler)
       proc->signal_handler[signum] = signal_handler;
       return 1;
     }
+}
+
+
+int
+clone(void (*fcn_arg) (void *), void *arg_arg, void *stack_arg)
+{
+  int i, pid;
+  struct proc *np;
+
+  // Allocate process.
+  if((np = allocproc()) == 0)
+    return -1;
+
+  np->pgdir = proc->pgdir;
+/*
+  if((np->pgdir = copyuvm(proc->pgdir, proc->sz)) == 0){
+    kfree(np->kstack);
+    np->kstack = 0;
+    np->state = UNUSED;
+    return -1;
+  }
+*/
+ 
+
+
+
+
+
+  // Clear %eax so that fork returns 0 in the child.
+  np->tf->eax = 0;
+
+  for(i = 0; i < NOFILE; i++)
+    if(proc->ofile[i])
+      np->ofile[i] = filedup(proc->ofile[i]);
+  np->cwd = idup(proc->cwd);
+ 
+  pid = np->pid;
+  np->state = RUNNABLE;
+  safestrcpy(np->name, proc->name, sizeof(proc->name));
+  return pid;
+}
+
+
+int
+join (void** stack)
+{
+  struct proc *p;
+  int havekids, pid;
+
+  acquire(&ptable.lock);
+  for(;;)
+  {
+    // Scan through table looking for zombie children.
+    havekids = 0;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+    {
+      if(p->parent != proc || p->pgdir != p->parent->pgdir)
+      {
+        //if(p->parent != proc)
+        continue;
+      }
+
+      havekids = 1;
+      if(p->state == ZOMBIE)
+      {
+        // Found one.
+  
+        void * stackAddr = (void*) p->parent->tf->esp + 7*sizeof(void*);
+  
+  
+        *(uint*)stackAddr = p->tf->ebp;
+        *(uint*)stackAddr += 3*sizeof(void*) -PGSIZE;
+  
+        pid = p->pid;
+        kfree(p->kstack);
+        p->kstack = 0;
+  
+  
+        //freevm(p->pgdir);
+        p->state = UNUSED;
+        p->pid = 0;
+        p->parent = 0;
+        p->name[0] = 0;
+        p->killed = 0;
+        release(&ptable.lock);
+        
+        //jp.pid = pid;
+        //jp.ebp = p->tf->ebp;
+        //return jp;
+        
+        return pid;
+      }
+    }
+
+    // No point waiting if we don't have any children.
+    if(!havekids || proc->killed)
+    {
+      //jp.pid = -1;
+      //jp.ebp = p->tf->ebp;
+      release(&ptable.lock);
+      //return jp;
+      return -1;
+    }
+
+    // Wait for children to exit.  (See wakeup1 call in proc_exit.)
+    sleep(proc, &ptable.lock);  //DOC: wait-sleep
+  }
 }
