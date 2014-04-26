@@ -3,7 +3,7 @@
 
 void clone_test()
 {
-	printf(1, "Inside close_test()\nChild Process PID: %d\nExiting\n", getpid());
+	printf(1, "Inside clone_test()\nChild Process PID: %d\nExiting\n", getpid());
 	
 	exit();
 }

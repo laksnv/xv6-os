@@ -499,50 +499,19 @@ clone(void (*fcn_arg) (void *), void *arg_arg, void *stack_arg)
     return -1;
 
   np->pgdir = proc->pgdir;
-/*
-  if((np->pgdir = copyuvm(proc->pgdir, proc->sz)) == 0){
-    kfree(np->kstack);
-    np->kstack = 0;
-    np->state = UNUSED;
-    return -1;
-  }
-*/
+
   np->sz = proc->sz;
   np->parent = proc;
   *np->tf = *proc->tf;
 
-
-
-
-    //cprintf("\n\n\n\nCur PID: %d\n", proc->pid);
-    //cprintf("\nNP PID: %d\n", np->pid);
-/*
-    cprintf("\nPrinting from clone()\n");
-    cprintf("Before assign\n");
-    cprintf("fcn: %p\n", fcn_arg);
-    cprintf("stack: %p\n", stack_arg);
-    //cprintf("Value at stack: %d\n",*(uint *)stack);
-    cprintf("Value at bottom-1 stack: %d\n", *(uint *)(stack_arg + PGSIZE - 2 * sizeof(void*)));
-    cprintf("Value at bottom stack: %d\n", *(uint *)(stack_arg + PGSIZE - sizeof(void*)));
-    cprintf("Value at bottom-2 stack: %d\n", *(uint *)(stack_arg + PGSIZE - 3 * sizeof(void*)));
-    cprintf("esp: %p\n", np->tf->esp);
-    cprintf("eip: %p\n", np->tf->eip);
-    cprintf("ebp: %p\n\n\n\n\n", np->tf->ebp);
-
-*/
-
-
-
-
-  //cprintf("\nPID: %d\n", np->pid);
-
   void *arg_in_stack;
-  void *retAdd_in_stack;
+  //void *retAdd_in_stack;
   arg_in_stack = stack_arg + PGSIZE - sizeof(void *);
   *(uint *)arg_in_stack = (uint) arg_arg;
+  cprintf("\nArgument in STACK (passed as arg to clone): %p\n", arg_in_stack);
 
-  retAdd_in_stack = stack_arg + PGSIZE - 2 * sizeof(void *);
-  *(uint *)retAdd_in_stack = 0xFFFFFFF;
+  //retAdd_in_stack = stack_arg + PGSIZE - 2 * sizeof(void *);
+  //*(uint *)retAdd_in_stack = 0xFFFFFFF;
 
   np->tf->esp = (uint) stack_arg;
   //memmove((void *)np->tf->esp, stack_arg, PGSIZE);
@@ -574,7 +543,7 @@ int
 join (void)
 {
   struct proc *p;
-  int havekids, pid, x = 0;
+  int havekids, pid;
 
   acquire(&ptable.lock);
   for(;;)
@@ -592,9 +561,7 @@ join (void)
         pid = p->pid;
         kfree(p->kstack);
         p->kstack = 0;
-        if(p->parent->state == RUNNABLE)
-          x = 1;
-        cprintf("\nParent state: %d", x);
+        
         cprintf("\nProcess %d, killing Process %d", proc->pid, p->pid);
         //freevm(p->pgdir);
         p->state = UNUSED;
