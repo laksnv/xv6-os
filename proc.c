@@ -505,17 +505,20 @@ clone(void (*fcn_arg) (void *), void *arg_arg, void *stack_arg)
   *np->tf = *proc->tf;
 
   void *arg_in_stack;
-  //void *retAdd_in_stack;
-  arg_in_stack = stack_arg + PGSIZE - sizeof(void *);
+  void *retAdd_in_stack;
+  
+  arg_in_stack = stack_arg + PGSIZE - 3 * sizeof(void *);
   *(uint *)arg_in_stack = (uint) arg_arg;
-  cprintf("\nArgument in STACK (passed as arg to clone): %p\n", arg_in_stack);
+  retAdd_in_stack = stack_arg + PGSIZE - 4 * sizeof(void *);
 
-  //retAdd_in_stack = stack_arg + PGSIZE - 2 * sizeof(void *);
+  cprintf("\nReturn address [from clone()]: %x\n", retAdd_in_stack);
+
+  
   //*(uint *)retAdd_in_stack = 0xFFFFFFF;
 
   np->tf->esp = (uint) stack_arg;
   //memmove((void *)np->tf->esp, stack_arg, PGSIZE);
-  np->tf->esp += PGSIZE - 2 * sizeof(void *);
+  np->tf->esp += PGSIZE - 4 * sizeof(void *);
   np->tf->ebp = np->tf->esp;
   np->tf->eip = (uint) fcn_arg;
 
@@ -559,10 +562,12 @@ join (void)
       {
         // Found one.
         pid = p->pid;
+        cprintf("\nGuessing ESP from join(): %x\n", p->tf->esp);
         kfree(p->kstack);
         p->kstack = 0;
         
         cprintf("\nProcess %d, killing Process %d", proc->pid, p->pid);
+        //cprintf("\nESP: %x\n", p->tf->esp);
         //freevm(p->pgdir);
         p->state = UNUSED;
         p->pid = 0;
