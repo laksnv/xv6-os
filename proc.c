@@ -503,24 +503,25 @@ clone(void (*fcn_arg) (void *), void *arg_arg, void *stack_arg)
   np->sz = proc->sz;
   np->parent = proc;
   *np->tf = *proc->tf;
+  np->stack = stack_arg;
 
   void *arg_in_stack;
   void *retAdd_in_stack;
   
-  arg_in_stack = stack_arg + PGSIZE - 3 * sizeof(void *);
+  arg_in_stack = stack_arg + PGSIZE - 1 * sizeof(void *);
   *(uint *)arg_in_stack = (uint) arg_arg;
-  retAdd_in_stack = stack_arg + PGSIZE - 4 * sizeof(void *);
 
-  cprintf("\nReturn address [from clone()]: %x\n", retAdd_in_stack);
+  retAdd_in_stack = stack_arg + PGSIZE - 2 * sizeof(void *);
+  *(uint *) retAdd_in_stack = 0xFFFFFFFF;
 
-  
-  //*(uint *)retAdd_in_stack = 0xFFFFFFF;
+  //cprintf("\nReturn address [from clone()]: %x\n", retAdd_in_stack);
 
-  np->tf->esp = (uint) stack_arg;
-  //memmove((void *)np->tf->esp, stack_arg, PGSIZE);
-  np->tf->esp += PGSIZE - 4 * sizeof(void *);
+
+  np->tf->esp = (int) stack_arg;
+  memmove((void *) np->tf->esp, stack_arg, PGSIZE);
+  np->tf->esp += PGSIZE - 2 * sizeof(void *);
   np->tf->ebp = np->tf->esp;
-  np->tf->eip = (uint) fcn_arg;
+  np->tf->eip = (int) fcn_arg;
 
 
 
@@ -543,7 +544,7 @@ clone(void (*fcn_arg) (void *), void *arg_arg, void *stack_arg)
 
 
 int
-join (void)
+join (void **stack2)
 {
   struct proc *p;
   int havekids, pid;
@@ -562,18 +563,28 @@ join (void)
       {
         // Found one.
         pid = p->pid;
-        cprintf("\nGuessing ESP from join(): %x\n", p->tf->esp);
+        //cprintf("\nGuessing ESP from join(): %x\n", p->tf->esp);
+
+        void *stackAddr = (void*) p->parent->tf->esp + 7 * sizeof(void*);
+        *(uint *) stackAddr = p->tf->ebp;
+        *(uint *) stackAddr += 3 * sizeof(void *) - PGSIZE ;
+        //memmove(*stack2, (void*)p->tf->esp, PGSIZE);
+
+
         kfree(p->kstack);
         p->kstack = 0;
-        
-        cprintf("\nProcess %d, killing Process %d", proc->pid, p->pid);
+        //cprintf("\nProcess %d, killing Process %d", proc->pid, p->pid);
         //cprintf("\nESP: %x\n", p->tf->esp);
         //freevm(p->pgdir);
+
         p->state = UNUSED;
         p->pid = 0;
         p->parent = 0;
         p->name[0] = 0;
         p->killed = 0;
+
+        *stack2 = p->stack;
+
         release(&ptable.lock);
         return pid;
       }
