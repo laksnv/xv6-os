@@ -148,17 +148,20 @@ sys_clone(void)
 int
 sys_join(void)
 {
-/*  
-  int temp;
+
   void **stack_arg;
+  int pid;
 
-  if(argint(0, &temp) < 0)
+  if(argptr(0, (void *) &stack_arg, sizeof(void *)) < 0)
     return -1;
-  stack_arg = (void **)temp;
 
-  return join(stack_arg);
-*/
-  return join();
+  while((pid = join(stack_arg)) != -1);
+  //pid = join(stack_arg);
+  return pid;
+
+  //return 1;
+
+  //return join(stack_arg);
 }
 
 int 

@@ -111,9 +111,9 @@ int
 growproc(int n)
 {
   uint sz;
-  //struct proc *p;
-  
-  //pde_t* pgdirtemp = proc->pgdir;
+  struct proc *p;
+  pde_t *pgdirtemp = proc->pgdir;
+
   sz = proc->sz;
   if(n > 0){
     if((sz = allocuvm(proc->pgdir, sz, sz + n)) == 0)
@@ -124,7 +124,7 @@ growproc(int n)
   }
   proc->sz = sz;
   switchuvm(proc);
-/*
+
   acquire(&ptable.lock);
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->pgdir == pgdirtemp){
@@ -135,7 +135,7 @@ growproc(int n)
     }
   }
   release(&ptable.lock);
-*/
+
   return 0;
 }
 
@@ -508,11 +508,11 @@ clone(void (*fcn_arg) (void *), void *arg_arg, void *stack_arg)
   void *arg_in_stack;
   void *retAdd_in_stack;
   
-  arg_in_stack = stack_arg + PGSIZE - 1 * sizeof(void *);
-  *(uint *)arg_in_stack = (uint) arg_arg;
-
-  retAdd_in_stack = stack_arg + PGSIZE - 2 * sizeof(void *);
+  retAdd_in_stack = stack_arg + 4096 - 2 * sizeof(void *);
   *(uint *) retAdd_in_stack = 0xFFFFFFFF;
+
+  arg_in_stack = stack_arg + 4096 - sizeof(void *);
+  *(uint *)arg_in_stack = (uint) arg_arg;
 
   //cprintf("\nReturn address [from clone()]: %x\n", retAdd_in_stack);
 
@@ -523,22 +523,19 @@ clone(void (*fcn_arg) (void *), void *arg_arg, void *stack_arg)
   np->tf->ebp = np->tf->esp;
   np->tf->eip = (int) fcn_arg;
 
-
-
-
-
-
-  // Clear %eax so that fork returns 0 in the child.
-  np->tf->eax = 0;
+  
 
   for(i = 0; i < NOFILE; i++)
     if(proc->ofile[i])
       np->ofile[i] = filedup(proc->ofile[i]);
   np->cwd = idup(proc->cwd);
- 
-  pid = np->pid;
+
+  // Clear %eax so that fork returns 0 in the child.
+  np->tf->eax = 0;
   np->state = RUNNABLE;
   safestrcpy(np->name, proc->name, sizeof(proc->name));
+
+  pid = np->pid;
   return pid;
 }
 
@@ -563,11 +560,12 @@ join (void **stack2)
       {
         // Found one.
         pid = p->pid;
+        int *tmp = (int*) 0x1FD8;
         //cprintf("\nGuessing ESP from join(): %x\n", p->tf->esp);
 
-        void *stackAddr = (void*) p->parent->tf->esp + 7 * sizeof(void*);
+        void *stackAddr = (void*) p->parent->tf->esp + 7 * sizeof(void *);
         *(uint *) stackAddr = p->tf->ebp;
-        *(uint *) stackAddr += 3 * sizeof(void *) - PGSIZE ;
+        *(uint *) stackAddr += 3 * sizeof(void *) - PGSIZE;
         //memmove(*stack2, (void*)p->tf->esp, PGSIZE);
 
 
@@ -584,6 +582,7 @@ join (void **stack2)
         p->killed = 0;
 
         *stack2 = p->stack;
+        *tmp = pid;
 
         release(&ptable.lock);
         return pid;
